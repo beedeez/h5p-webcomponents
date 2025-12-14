@@ -1,0 +1,44 @@
+{
+    "name": "@lumieducation/h5p-webcomponents",
+    "version": "10.0.4",
+    "description": "A Web Component wrapper around the H5P Editor and Player",
+    "author": "Sebastian Rettig",
+    "license": "GPL-3.0-or-later",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Lumieducation/h5p-webcomponents"
+    },
+    "main": "./build/umd/index.js",
+    "module": "./build/es2015/index.js",
+    "types": "./build/es2015/index.d.ts",
+    "scripts": {
+        "build:watch": "npx tsc --watch",
+        "build": "npx tsc --build tsconfig.es2015.json && npx tsc --build tsconfig.umd.json",
+        "clean": "rm -rf build && rm -rf coverage && rm -rf node_modules"
+    },
+    "release": {
+        "branch": "master"
+    },
+    "contributors": [
+        {
+            "name": "Sebastian Rettig",
+            "email": "serettig@posteo.de"
+        }
+    ],
+    "dependencies": {
+        "await-lock": "^2.2.2",
+        "deepmerge": "^4.3.1"
+    },
+    "devDependencies": {
+        "@lumieducation/h5p-server": "^10.0.4",
+        "@types/resize-observer-browser": "0.1.11",
+        "@types/node": "^20",
+        "typescript": "5.9.3"
+    },
+    "files": [
+        "build",
+        "CHANGELOG.md",
+        "README.md"
+    ],
+    "packageManager": "pnpm@8.15.9+sha512.499434c9d8fdd1a2794ebf4552b3b25c0a633abcee5bb15e7b5de90f32f47b513aca98cd5cfd001c31f0db454bc3804edccd578501e4ca293a6816166bbd9f81"
+}
