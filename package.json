@@ -14,7 +14,8 @@
     "scripts": {
         "build:watch": "npx tsc --watch",
         "build": "npx tsc --build tsconfig.es2015.json && npx tsc --build tsconfig.umd.json",
-        "clean": "rm -rf build && rm -rf coverage && rm -rf node_modules"
+        "clean": "rm -rf build && rm -rf coverage && rm -rf node_modules",
+        "prepare": "rm -rf build && npm run build"
     },
     "release": {
         "branch": "master"
