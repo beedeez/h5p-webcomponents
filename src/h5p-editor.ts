@@ -23,11 +23,11 @@ export class H5PEditorComponent extends HTMLElement {
         H5PEditorComponent.initTemplate();
     }
 
-    public get contentId(): string {
+    public get contentId(): string | undefined {
         return this.getAttribute('content-id') ?? undefined;
     }
 
-    public set contentId(contentId: string) {
+    public set contentId(contentId: string | undefined) {
         if (!contentId) {
             this.removeAttribute('content-id');
         } else {
@@ -69,7 +69,8 @@ export class H5PEditorComponent extends HTMLElement {
         const mustRender = this.privateLoadContentCallback !== callback;
         this.privateLoadContentCallback = callback;
         if (mustRender) {
-            this.render(this.contentId);
+            // render() is async; race-safe via renderSeq
+            void this.render(this.contentId);
         }
     }
 
@@ -116,9 +117,12 @@ export class H5PEditorComponent extends HTMLElement {
         }
     >;
 
-    private resizeObserver: ResizeObserver;
+    private resizeObserver: ResizeObserver | null;
 
-    private root: HTMLElement;
+    private root: HTMLElement | null;
+
+    // Race condition protection: monotonically increasing sequence for render calls.
+    private renderSeq = 0;
 
     private static initTemplate(): void {
         // We create the static template only once
@@ -162,7 +166,10 @@ export class H5PEditorComponent extends HTMLElement {
      * Called when the component is added to the DOM.
      */
     public async connectedCallback(): Promise<void> {
-        this.appendChild(H5PEditorComponent.template.content.cloneNode(true));
+        // Prevent template duplication on reconnects.
+        if (!this.querySelector('.h5p-editor-component-root')) {
+            this.appendChild(H5PEditorComponent.template.content.cloneNode(true));
+        }
         this.root = this.querySelector('.h5p-editor-component-root');
 
         this.resizeObserver = new ResizeObserver(() => {
@@ -359,6 +366,9 @@ export class H5PEditorComponent extends HTMLElement {
             return;
         }
 
+        // Race condition protection: only the latest render call is allowed to touch the DOM.
+        const mySeq = ++this.renderSeq;
+
         let editorModel: IEditorModel & {
             library?: string;
             metadata?: IContentMetadata;
@@ -369,12 +379,16 @@ export class H5PEditorComponent extends HTMLElement {
                 contentId === 'new' ? undefined : contentId
             );
         } catch (error) {
-            this.root.innerHTML = `<p>Error loading H5P content from server: ${error.message}`;
+            if (mySeq === this.renderSeq && this.root) {
+                this.root.innerHTML = `<p>Error loading H5P content from server: ${error.message}`;
+            }
             return;
         }
 
-        // Reset DOM tree inside component.
-        this.root.innerHTML = '';
+        // Abort if a newer render started while awaiting loadContentCallback.
+        if (mySeq !== this.renderSeq) {
+            return;
+        }
 
         // We have to prevent H5P from initializing when the h5p.js file is
         // loaded.
@@ -398,6 +412,18 @@ export class H5PEditorComponent extends HTMLElement {
             editorModel.scripts,
             document.getElementsByTagName('head')[0]
         );
+
+        // Abort if a newer render started while awaiting addScripts.
+        if (mySeq !== this.renderSeq) {
+            return;
+        }
+
+        if (!this.root) {
+            return;
+        }
+
+        // Reset DOM tree inside component (moved AFTER async work to prevent races).
+        this.root.innerHTML = '';
 
         // Create the necessary DOM tree.
         const h5pCreateDiv = document.createElement('div');
@@ -466,6 +492,11 @@ export class H5PEditorComponent extends HTMLElement {
         H5PEditor.enableContentHub =
             editorModel.integration.editor.enableContentHub || false;
 
+        // Abort if a newer render started before instantiating the editor.
+        if (mySeq !== this.renderSeq) {
+            return;
+        }
+
         if (contentId === 'new') {
             // Create an empty editor for new content
             this.editorInstance = new ns.Editor(
@@ -485,6 +516,9 @@ export class H5PEditorComponent extends HTMLElement {
             );
         }
 
-        h5pCreateDiv.hidden = false;
+        // Only reveal if this render is still current.
+        if (mySeq === this.renderSeq) {
+            h5pCreateDiv.hidden = false;
+        }
     }
 }
